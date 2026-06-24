@@ -193,6 +193,28 @@ class Replacer {
   }
 }
 
+export function extractTarballNameFromNpmPackOutput(stdout: string, stderr: string): string {
+  const trimmedStdout = stdout.trim();
+  const trimmedStderr = stderr.trim();
+  let combinedOutput = trimmedStdout;
+  if (trimmedStdout === "" && trimmedStderr !== "") {
+    combinedOutput = trimmedStderr.split("\n").pop() ?? "";
+  }
+  if (combinedOutput.endsWith(".tgz")) {
+    return combinedOutput;
+  }
+  const firstTgzInStdout = trimmedStdout.split(/\s+/).find(token => token.endsWith(".tgz"));
+  const firstTgzInStderr = trimmedStderr.split(/\s+/).find(token => token.endsWith(".tgz"));
+  const tgzName = firstTgzInStdout ?? firstTgzInStderr;
+  if (tgzName !== undefined) {
+    return tgzName;
+  }
+  throw new Error(
+    `npm pack did not produce a recognizable tarball name.\n` +
+      `stdout: ${stdout}\nstderr: ${stderr}`,
+  );
+}
+
 async function createWithScaffold(logger: SimpleLogger, scaffold: Scaffold) {
   let projectNameIndex = -1;
   for (const [index, arg] of scaffold.args.entries()) {
@@ -281,32 +303,10 @@ async function createWithScaffold(logger: SimpleLogger, scaffold: Scaffold) {
     child.on("error", reject);
     child.on("exit", code => {
       if (code === 0) {
-        const trimmedStdout = stdout.trim();
-        const trimmedStderr = stderr.trim();
-        let combinedOutput = trimmedStdout;
-        if (trimmedStdout === "" && trimmedStderr !== "") {
-          combinedOutput = trimmedStderr.split("\n").pop() ?? "";
-        }
-        if (combinedOutput.endsWith(".tgz")) {
-          resolve(combinedOutput);
-        } else {
-          const firstTgzInStdout = trimmedStdout
-            .split(/\s+/)
-            .find(token => token.endsWith(".tgz"));
-          const firstTgzInStderr = trimmedStderr
-            .split(/\s+/)
-            .find(token => token.endsWith(".tgz"));
-          const tgzName = firstTgzInStdout ?? firstTgzInStderr;
-          if (tgzName !== undefined) {
-            resolve(tgzName);
-          } else {
-            reject(
-              new Error(
-                `npm pack did not produce a recognizable tarball name.\n` +
-                  `stdout: ${stdout}\nstderr: ${stderr}`,
-              ),
-            );
-          }
+        try {
+          resolve(extractTarballNameFromNpmPackOutput(stdout, stderr));
+        } catch (e) {
+          reject(e);
         }
       } else {
         reject(new Error(`npm pack exited with code ${code}.\nstdout: ${stdout}\nstderr: ${stderr}`));

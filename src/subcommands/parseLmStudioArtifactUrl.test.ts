@@ -43,4 +43,14 @@ describe("tryParseLmStudioArtifactUrl", () => {
       "Invalid LM Studio artifact URL. Expected https://lmstudio.ai/models/owner/name or https://lmstudio.ai/owner/name.",
     );
   });
+
+  it("gives a helpful error for https://lmstudio.ai/models (no owner/name)", () => {
+    expect(() => tryParseLmStudioArtifactUrl("https://lmstudio.ai/models")).toThrow(
+      "This URL only points to lmstudio.ai/models.",
+    );
+  });
+
+  it("returns null for a completely unrelated URL", () => {
+    expect(tryParseLmStudioArtifactUrl("https://example.com/foo/bar")).toBeNull();
+  });
 });

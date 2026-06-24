@@ -137,7 +137,7 @@ function getRequestedCompatibilityTypes({
   return compatibilityTypes;
 }
 
-function splitModelNameAndQuantization(modelName: string | undefined) {
+export function splitModelNameAndQuantization(modelName: string | undefined) {
   let normalizedModelName = modelName?.trim();
   let specifiedQuantName: string | undefined;
   if (normalizedModelName === undefined || normalizedModelName === "") {
@@ -148,28 +148,59 @@ function splitModelNameAndQuantization(modelName: string | undefined) {
   }
 
   const raw = normalizedModelName;
-  const len = raw.length;
-  const standaloneAtPositions: Array<number> = [];
-  for (let i = 0; i < len; i++) {
-    if (raw[i] !== "@") {
-      continue;
-    }
-    const prevIsAt = i > 0 && raw[i - 1] === "@";
-    const nextIsAt = i < len - 1 && raw[i + 1] === "@";
-    if (!prevIsAt && !nextIsAt) {
-      standaloneAtPositions.push(i);
+
+  const tokens: Array<{ type: "char" | "escapedAt"; value: string; pos: number }> = [];
+  let i = 0;
+  while (i < raw.length) {
+    if (raw[i] === "@" && i + 1 < raw.length && raw[i + 1] === "@") {
+      tokens.push({ type: "escapedAt", value: "@", pos: i });
+      i += 2;
+    } else if (raw[i] === "@") {
+      tokens.push({ type: "char", value: "@", pos: i });
+      i += 1;
+    } else {
+      const start = i;
+      while (i < raw.length && raw[i] !== "@") {
+        i++;
+      }
+      tokens.push({ type: "char", value: raw.slice(start, i), pos: start });
     }
   }
 
-  const unescape = (s: string): string => s.replace(/@@/g, "@");
+  const standaloneAtTokens = tokens.filter(t => t.type === "char" && t.value === "@");
 
-  if (standaloneAtPositions.length === 0) {
-    normalizedModelName = unescape(raw);
-  } else if (standaloneAtPositions.length === 1) {
-    const sep = standaloneAtPositions[0];
-    const before = raw.slice(0, sep);
-    const after = raw.slice(sep + 1);
-    if (after.includes("@")) {
+  const rebuildName = (tokenSlice: typeof tokens): string =>
+    tokenSlice.map(t => t.value).join("");
+
+  if (standaloneAtTokens.length === 0) {
+    const hasEscape = tokens.some(t => t.type === "escapedAt");
+    if (hasEscape) {
+      throw new Error(
+        text`
+          Invalid model name: found '@@' escape sequences but no quantization separator '@'.
+          If you meant to separate the model name from a quantization, use a single '@', e.g.
+          "model@Q4_K_M". If the '@' is part of the model name and you are not specifying a
+          quantization, just write it directly without '@@' escaping, e.g. "model@name".
+        `,
+      );
+    }
+    normalizedModelName = raw;
+  } else if (standaloneAtTokens.length === 1) {
+    const sepIndex = tokens.indexOf(standaloneAtTokens[0]);
+    const beforeTokens = tokens.slice(0, sepIndex);
+    const afterTokens = tokens.slice(sepIndex + 1);
+
+    const afterRaw = rebuildName(afterTokens);
+    if (afterRaw === "") {
+      throw new Error(
+        text`
+          Invalid model name: quantization name after '@' cannot be empty.
+          If you meant to specify a quantization, provide a name after '@', e.g. "model@Q4_K_M".
+          If the '@' is part of the model name, escape it as '@@', e.g. "model@@name".
+        `,
+      );
+    }
+    if (afterTokens.some(t => t.type === "char" && t.value === "@")) {
       throw new Error(
         text`
           Invalid model name: quantization suffix cannot contain '@'.
@@ -178,24 +209,46 @@ function splitModelNameAndQuantization(modelName: string | undefined) {
         `,
       );
     }
-    normalizedModelName = unescape(before);
-    specifiedQuantName = after === "" ? undefined : after;
+    normalizedModelName = rebuildName(beforeTokens);
+    if (normalizedModelName === "") {
+      throw new Error(
+        text`
+          Invalid model name: model name before '@' cannot be empty.
+        `,
+      );
+    }
+    specifiedQuantName = afterRaw;
   } else {
-    const sampleEscaped = raw.replace(/@/g, (c, idx) => {
-      const prevIsAt = idx > 0 && raw[idx - 1] === "@";
-      const nextIsAt = idx < len - 1 && raw[idx + 1] === "@";
-      if (prevIsAt || nextIsAt) {
-        return c;
+    const highlightedInput = raw.replace(/@@/g, "\x00\x00").replace(/@/g, chalk.red("@")).replace(/\x00\x00/g, "@@");
+    const hasAdjacent = standaloneAtTokens.some((t, idx) => {
+      if (idx === 0) {
+        return t.pos === 0;
       }
-      return chalk.red(c);
+      const prevToken = standaloneAtTokens[idx - 1];
+      const between = tokens.slice(tokens.indexOf(prevToken) + 1, tokens.indexOf(t));
+      return between.length === 0;
     });
+    if (hasAdjacent) {
+      throw new Error(
+        text`
+          Ambiguous model name: adjacent quantization separators suggest an empty quantization
+          segment. If your model name contains literal '@' characters, escape them by writing
+          '@@', then use a single '@' before the quantization suffix.
+
+          Input: ${highlightedInput}
+
+          Example for model "foo@bar" with quantization "Q4_K_M":
+              ${chalk.yellow("foo@@bar@Q4_K_M")}
+        `,
+      );
+    }
     throw new Error(
       text`
         Ambiguous model name: found multiple quantization separators (standalone '@' characters).
         If your model name contains literal '@' characters, escape them by writing '@@', then use
         a single '@' before the quantization suffix.
 
-        Input: ${sampleEscaped}
+        Input: ${highlightedInput}
 
         Example for model "foo@bar@baz" with quantization "Q4_K_M":
             ${chalk.yellow("foo@@bar@@baz@Q4_K_M")}

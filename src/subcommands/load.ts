@@ -409,6 +409,7 @@ loadCommand.action(async (modelKeyArg, options: LoadCommandOptions) => {
   logger.debug("Initial filtered models length:", initialFilteredModels.length);
 
   let model: ModelInfo;
+  let deferToPreferredDevice = false;
   if (yes) {
     if (initialFilteredModels.length === 0) {
       logger.errorWithoutPrefix(
@@ -439,6 +440,7 @@ loadCommand.action(async (modelKeyArg, options: LoadCommandOptions) => {
         model = models[initialFilteredModels[0].index];
       } else {
         model = matchingModels[0];
+        deferToPreferredDevice = true;
       }
     } else {
       model = models[initialFilteredModels[0].index];
@@ -498,6 +500,7 @@ loadCommand.action(async (modelKeyArg, options: LoadCommandOptions) => {
         });
       } else {
         model = matchingModels[0];
+        deferToPreferredDevice = true;
       }
     }
   }
@@ -507,7 +510,7 @@ loadCommand.action(async (modelKeyArg, options: LoadCommandOptions) => {
     const estimate = await (
       model.type === "llm" ? client.llm : client.embedding
     ).estimateResourcesUsage(model.modelKey, loadConfig, {
-      deviceIdentifier: model.deviceIdentifier,
+      deviceIdentifier: deferToPreferredDevice ? undefined : model.deviceIdentifier,
     });
     printEstimatedResourceUsage(model, loadConfig.contextLength, gpu, estimate, logger);
     return;
@@ -535,7 +538,7 @@ loadCommand.action(async (modelKeyArg, options: LoadCommandOptions) => {
     identifier,
     config: loadConfig,
     ttlSeconds,
-    deviceIdentifier: model.deviceIdentifier,
+    deviceIdentifier: deferToPreferredDevice ? undefined : model.deviceIdentifier,
   });
 });
 

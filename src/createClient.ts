@@ -12,12 +12,15 @@ import { createRefinedNumberParser } from "./types/refinedNumber.js";
 
 export const DEFAULT_SERVER_PORT: number = 1234;
 
-function isLocalHost(host: string): boolean {
+export function isLocalHost(host: string): boolean {
   const normalized = host.trim().toLowerCase();
-  if (normalized === "127.0.0.1" || normalized === "localhost") {
+  if (normalized === "localhost") {
     return true;
   }
   if (normalized === "[::1]" || normalized === "::1") {
+    return true;
+  }
+  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(normalized)) {
     return true;
   }
   if (/^0\.0\.0\.0$/.test(normalized)) {

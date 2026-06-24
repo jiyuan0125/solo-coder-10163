@@ -12,6 +12,7 @@
     "clean": "shx rm -rf ./dist ./tsconfig.tsbuildinfo",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "test": "vitest run",
     "postinstall": "patch-package"
   },
   "engines": {
@@ -54,7 +55,8 @@
     "prettier": "^3.2.5",
     "react-devtools-core": "^7.0.1",
     "shx": "^0.3.4",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^3.0.0"
   },
   "gitHead": "d95ce2feb067b4eec446c673155631ee1734e982"
 }
