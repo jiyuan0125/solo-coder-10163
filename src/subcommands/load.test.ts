@@ -1,3 +1,7 @@
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@lmstudio/sdk", () => ({}));
+
 import { resolveCliSpeculativeDecodingLoadConfig } from "./loadSpeculativeDecoding.js";
 
 describe("resolveCliSpeculativeDecodingLoadConfig", () => {

@@ -1,3 +1,119 @@
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@commander-js/extra-typings", () => {
+  const chainable = (): any =>
+    new Proxy(function () { return chainable(); }, {
+      get: () => chainable(),
+    });
+  return {
+    Command: class {
+      constructor() {
+        return chainable();
+      }
+    },
+    Option: class {
+      constructor() {
+        return chainable();
+      }
+    },
+  };
+});
+
+vi.mock("@inquirer/prompts", () => ({
+  search: vi.fn(),
+  select: vi.fn(),
+  input: vi.fn(),
+  confirm: vi.fn(),
+}));
+
+vi.mock("@lmstudio/lms-common", () => ({
+  text: (strings: TemplateStringsArray, ...values: any[]) =>
+    String.raw({ raw: strings }, ...values),
+  SimpleLogger: class {},
+}));
+
+vi.mock("@lmstudio/lms-isomorphic", () => ({
+  terminalSize: () => ({ rows: 24, columns: 80 }),
+}));
+
+vi.mock("@lmstudio/sdk", () => ({
+  LMStudioClient: class {},
+}));
+
+vi.mock("chalk", () => ({
+  default: new Proxy({}, {
+    get: (_target, prop) => {
+      if (typeof prop === "symbol") return () => "";
+      const fn = (str: string) => String(str);
+      return fn;
+    },
+  }),
+}));
+
+vi.mock("fuzzy", () => ({
+  filter: vi.fn(() => []),
+}));
+
+vi.mock("zod", () => ({
+  z: {
+    object: () => ({ parse: () => ({}), safeParse: () => ({ success: true, data: {} }) }),
+    string: () => ({}),
+    boolean: () => ({}),
+    number: () => ({}),
+    array: () => ({}),
+    enum: () => ({}),
+  },
+}));
+
+vi.mock("../createClient.js", () => ({
+  addCreateClientOptions: vi.fn(),
+  createClient: vi.fn(),
+}));
+
+vi.mock("../formatBytes.js", () => ({
+  formatSizeBytes1000: vi.fn(),
+  formatSizeBytesWithColor1000: vi.fn(),
+}));
+
+vi.mock("../handleDownloadWithProgressBar.js", () => ({
+  handleDownloadWithProgressBar: vi.fn(),
+}));
+
+vi.mock("../inquirerTheme.js", () => ({
+  fuzzyHighlightOptions: {},
+  searchTheme: {},
+}));
+
+vi.mock("../logLevel.js", () => ({
+  addLogLevelOptions: vi.fn(),
+  createLogger: vi.fn(),
+}));
+
+vi.mock("../prompt.js", () => ({
+  runPromptWithExitHandling: vi.fn(),
+}));
+
+vi.mock("../cliPref.js", () => ({
+  getCliPref: vi.fn(),
+}));
+
+vi.mock("../ProgressBar.js", () => ({
+  ProgressBar: class {},
+}));
+
+vi.mock("../SimpleFileData.js", () => ({
+  SimpleFileData: class {},
+}));
+
+vi.mock("../lmstudioPaths.js", () => ({
+  lmsKey2Path: "/tmp/lms-key-2",
+  cliPrefPath: "/tmp/cli-pref.json",
+}));
+
+vi.mock("./parseLmStudioArtifactUrl.js", () => ({
+  tryParseLmStudioArtifactUrl: vi.fn(),
+}));
+
 import { splitModelNameAndQuantization } from "./get.js";
 
 describe("splitModelNameAndQuantization", () => {

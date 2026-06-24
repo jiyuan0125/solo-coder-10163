@@ -317,6 +317,9 @@ loadCommand.action(async (modelKeyArg, options: LoadCommandOptions) => {
       return aIndex < bIndex ? -1 : aIndex > bIndex ? 1 : 0;
     });
 
+  let model: ModelInfo;
+  let deferToPreferredDevice = false;
+
   if (exact) {
     if (modelKey === undefined) {
       logger.errorWithoutPrefix(
@@ -332,8 +335,7 @@ loadCommand.action(async (modelKeyArg, options: LoadCommandOptions) => {
     }
     // In this case, we expect a model path and not a model key
     const modelPath = modelKey;
-    const model = models.find(model => model.path === modelPath);
-    if (model === undefined) {
+    model = models.find(model => model.path === modelPath) ?? ((): ModelInfo => {
       if (models.length === 0) {
         logger.errorWithoutPrefix(
           makeTitledPrettyError(
@@ -376,13 +378,13 @@ loadCommand.action(async (modelKeyArg, options: LoadCommandOptions) => {
         );
       }
       process.exit(1);
-    }
+    })();
     if (estimateOnly === true) {
       assertSpeculativeDecodingSupportedForCliModel({ model, loadConfig, logger });
       const estimate = await (
         model.type === "llm" ? client.llm : client.embedding
       ).estimateResourcesUsage(model.modelKey, loadConfig, {
-        deviceIdentifier: model.deviceIdentifier,
+        deviceIdentifier: deferToPreferredDevice ? undefined : model.deviceIdentifier,
       });
       printEstimatedResourceUsage(model, loadConfig.contextLength, gpu, estimate, logger);
       return;
@@ -398,7 +400,7 @@ loadCommand.action(async (modelKeyArg, options: LoadCommandOptions) => {
       identifier,
       config: loadConfig,
       ttlSeconds,
-      deviceIdentifier: model.deviceIdentifier,
+      deviceIdentifier: deferToPreferredDevice ? undefined : model.deviceIdentifier,
     });
     return;
   }
@@ -408,8 +410,6 @@ loadCommand.action(async (modelKeyArg, options: LoadCommandOptions) => {
   const initialFilteredModels = fuzzy.filter(modelKey ?? "", modelKeys);
   logger.debug("Initial filtered models length:", initialFilteredModels.length);
 
-  let model: ModelInfo;
-  let deferToPreferredDevice = false;
   if (yes) {
     if (initialFilteredModels.length === 0) {
       logger.errorWithoutPrefix(

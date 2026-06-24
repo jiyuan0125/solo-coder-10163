@@ -1,3 +1,50 @@
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@commander-js/extra-typings", () => ({
+  Option: class {},
+  Command: class {},
+}));
+
+vi.mock("@lmstudio/lms-common", () => ({
+  text: (strings: TemplateStringsArray, ...values: any[]) =>
+    String.raw({ raw: strings }, ...values),
+  SimpleLogger: class {},
+}));
+
+vi.mock("@lmstudio/lms-common-server", () => ({
+  findOrStartLlmster: vi.fn(),
+  findLMStudioHome: vi.fn(() => "/tmp/.lmstudio"),
+}));
+
+vi.mock("@lmstudio/sdk", () => ({
+  LMStudioClient: class {},
+}));
+
+vi.mock("chalk", () => ({
+  default: new Proxy({}, {
+    get: (_target, prop) => {
+      if (typeof prop === "symbol") return () => "";
+      const fn = (str: string) => String(str);
+      return fn;
+    },
+  }),
+}));
+
+vi.mock("../exists.js", () => ({
+  exists: vi.fn(),
+}));
+
+vi.mock("../lmstudioPaths.js", () => ({
+  lmsKey2Path: "/tmp/.lmstudio/lms-key-2",
+  cliPrefPath: "/tmp/.lmstudio/cli-pref.json",
+}));
+
+vi.mock("../logLevel.js", () => ({}));
+
+vi.mock("../types/refinedNumber.js", () => ({
+  createRefinedNumberParser: vi.fn(),
+}));
+
 import { isLocalHost } from "./createClient.js";
 
 describe("isLocalHost", () => {

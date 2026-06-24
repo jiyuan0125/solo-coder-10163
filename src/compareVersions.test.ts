@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import { compareVersions } from "./compareVersions.js";
 
 describe("Version Comparison Functions", () => {

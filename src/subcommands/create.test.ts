@@ -1,3 +1,96 @@
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@commander-js/extra-typings", () => {
+  const chainable = (): any =>
+    new Proxy(function () { return chainable(); }, {
+      get: () => chainable(),
+    });
+  return {
+    Command: class {
+      constructor() {
+        return chainable();
+      }
+    },
+    Option: class {
+      constructor() {
+        return chainable();
+      }
+    },
+  };
+});
+
+vi.mock("@inquirer/prompts", () => ({
+  input: vi.fn(),
+  search: vi.fn(),
+}));
+
+vi.mock("@lmstudio/lms-common", () => ({
+  filteredArray: () => ({ parse: (v: any) => v }),
+  text: (strings: TemplateStringsArray, ...values: any[]) =>
+    String.raw({ raw: strings }, ...values),
+  SimpleLogger: class {},
+}));
+
+vi.mock("@lmstudio/lms-isomorphic", () => ({
+  terminalSize: () => ({ rows: 24, columns: 80 }),
+}));
+
+vi.mock("chalk", () => ({
+  default: new Proxy({}, {
+    get: (_target, prop) => {
+      if (typeof prop === "symbol") return () => "";
+      const fn = (str: string) => String(str);
+      return fn;
+    },
+  }),
+}));
+
+vi.mock("fast-glob", () => ({
+  default: () => Promise.resolve([]),
+}));
+
+vi.mock("fuzzy", () => ({
+  filter: vi.fn(() => []),
+}));
+
+vi.mock("zod", () => {
+  const chainable = () => {
+    const fn: any = () => chainable();
+    fn.optional = () => fn;
+    fn.default = () => fn;
+    fn.describe = () => fn;
+    fn.min = () => fn;
+    fn.max = () => fn;
+    fn.int = () => fn;
+    return fn;
+  };
+  return {
+    z: new Proxy({} as any, {
+      get: () => (..._args: any[]) => chainable(),
+    }),
+  };
+});
+
+vi.mock("../logLevel.js", () => ({
+  addLogLevelOptions: vi.fn(),
+  createLogger: vi.fn(),
+}));
+
+vi.mock("../ProgressBar.js", () => ({
+  ProgressBar: class {},
+}));
+
+vi.mock("../prompt.js", () => ({
+  runPromptWithExitHandling: vi.fn(),
+}));
+
+vi.mock("../inquirerTheme.js", () => ({
+  ANSI_CYAN: "\x1b[36m",
+  ANSI_RESET_COLOR: "\x1b[0m",
+  fuzzyHighlightOptions: {},
+  searchTheme: {},
+}));
+
 import { extractTarballNameFromNpmPackOutput } from "./create.js";
 
 describe("extractTarballNameFromNpmPackOutput", () => {
