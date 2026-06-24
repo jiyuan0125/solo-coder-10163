@@ -713,12 +713,6 @@ async function queryHuggingFace(logger: SimpleLogger, term: string) {
   }
 }
 
-const userScores = new Map([
-  ["lmstudio-community", 3],
-  ["bartowski", 2],
-  ["TheBloke", 1],
-]);
-
 /**
  * Find candidate user and repository names on Hugging Face.
  *
@@ -731,31 +725,35 @@ async function findCandidateHuggingFaceUserRepos(logger: SimpleLogger, fileName:
   const breakingPoints = await findFileNameBreakPoints(fullSearchTerm);
   breakingPoints.push(fullSearchTerm.length);
 
+  const seenCandidates = new Map<string, number>();
   const candidates: Array<[string, string]> = [];
 
   for (let i = breakingPoints.length - 1; i >= 0; i--) {
     const term = fullSearchTerm.substring(0, breakingPoints[i]);
     const repos = await queryHuggingFace(logger, term);
-    for (const repo of repos) {
+    let foundAnyForTerm = false;
+    for (let repoIndex = 0; repoIndex < repos.length; repoIndex++) {
+      const repo = repos[repoIndex];
       if (
         repo.siblings.some(sibling => sibling.rfilename.toLowerCase() === fileName.toLowerCase())
       ) {
         const split = repo.id.split("/");
         if (split.length === 2) {
-          candidates.push(split as [string, string]);
+          const key = `${split[0]}/${split[1]}`;
+          if (!seenCandidates.has(key)) {
+            seenCandidates.set(key, candidates.length);
+            candidates.push(split as [string, string]);
+          }
+          foundAnyForTerm = true;
         }
       }
     }
-    if (candidates.length > 0) {
+    // Keep iterating through shorter prefixes even if we found some matches for this term,
+    // to expand the candidate pool. Only stop early if we've gathered a comfortable number.
+    if (foundAnyForTerm && candidates.length >= 25) {
       break;
     }
   }
-
-  candidates.sort((a, b) => {
-    const aScore = userScores.get(a[0]) ?? 0;
-    const bScore = userScores.get(b[0]) ?? 0;
-    return bScore - aScore;
-  });
 
   logger.debug("Candidates found", candidates);
   return candidates;

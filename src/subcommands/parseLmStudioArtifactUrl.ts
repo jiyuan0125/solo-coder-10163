@@ -30,6 +30,11 @@ export function tryParseLmStudioArtifactUrl(modelName: string): ParsedLmStudioAr
   } else if (pathSegments.length === 3 && pathSegments[0] === "models") {
     owner = pathSegments[1];
     name = pathSegments[2];
+  } else if (pathSegments.length === 1 && pathSegments[0] === "models") {
+    throw new Error(
+      "This URL only points to lmstudio.ai/models. " +
+        "Please include the owner and model name, e.g. https://lmstudio.ai/models/owner/name.",
+    );
   } else {
     throw new Error(invalidLmStudioArtifactUrlMessage);
   }

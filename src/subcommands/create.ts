@@ -264,6 +264,7 @@ async function createWithScaffold(logger: SimpleLogger, scaffold: Scaffold) {
 
   const tarballName = await new Promise<string>((resolve, reject) => {
     let stdout = "";
+    let stderr = "";
     const child = spawn(
       process.platform === "win32" ? "npm.cmd" : "npm",
       ["pack", `@lmstudio/scaffold-${scaffold.name}@latest`, "--prefer-online"],
@@ -273,12 +274,42 @@ async function createWithScaffold(logger: SimpleLogger, scaffold: Scaffold) {
       const str = data.toString();
       stdout += str;
     });
+    child.stderr.on("data", data => {
+      const str = data.toString();
+      stderr += str;
+    });
     child.on("error", reject);
     child.on("exit", code => {
       if (code === 0) {
-        resolve(stdout.trim());
+        const trimmedStdout = stdout.trim();
+        const trimmedStderr = stderr.trim();
+        let combinedOutput = trimmedStdout;
+        if (trimmedStdout === "" && trimmedStderr !== "") {
+          combinedOutput = trimmedStderr.split("\n").pop() ?? "";
+        }
+        if (combinedOutput.endsWith(".tgz")) {
+          resolve(combinedOutput);
+        } else {
+          const firstTgzInStdout = trimmedStdout
+            .split(/\s+/)
+            .find(token => token.endsWith(".tgz"));
+          const firstTgzInStderr = trimmedStderr
+            .split(/\s+/)
+            .find(token => token.endsWith(".tgz"));
+          const tgzName = firstTgzInStdout ?? firstTgzInStderr;
+          if (tgzName !== undefined) {
+            resolve(tgzName);
+          } else {
+            reject(
+              new Error(
+                `npm pack did not produce a recognizable tarball name.\n` +
+                  `stdout: ${stdout}\nstderr: ${stderr}`,
+              ),
+            );
+          }
+        }
       } else {
-        reject(new Error(`npm install exited with code ${code}`));
+        reject(new Error(`npm pack exited with code ${code}.\nstdout: ${stdout}\nstderr: ${stderr}`));
       }
     });
   });

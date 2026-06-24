@@ -33,14 +33,16 @@ import { UserInputError } from "./types/UserInputError.js";
 const processArguments = process.argv.slice();
 let commandArguments = processArguments.slice(2);
 
-// If we don't pass in any arguments, in bun, the first argument is the path to the execPath.
-// So we need to check for that and remove it.
-if (commandArguments.length === 1) {
+// In Bun, when the script is invoked through certain paths (e.g., aliases, wrapper scripts),
+// Bun may place its own execPath as argv[1] (commandArguments[0]).
+// Always check if the first user-supplied argument resolves to process.execPath and skip it
+// if so, regardless of how many arguments there are.
+if (commandArguments.length >= 1) {
   try {
     const resolvedCandidatePath = resolvePath(commandArguments[0]);
     const resolvedExecPath = resolvePath(process.execPath);
     if (resolvedCandidatePath === resolvedExecPath) {
-      commandArguments = [];
+      commandArguments = commandArguments.slice(1);
     }
   } catch {
     // If path resolution fails for any reason, fall back to the original arguments.

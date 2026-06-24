@@ -12,6 +12,20 @@ import { createRefinedNumberParser } from "./types/refinedNumber.js";
 
 export const DEFAULT_SERVER_PORT: number = 1234;
 
+function isLocalHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase();
+  if (normalized === "127.0.0.1" || normalized === "localhost") {
+    return true;
+  }
+  if (normalized === "[::1]" || normalized === "::1") {
+    return true;
+  }
+  if (/^0\.0\.0\.0$/.test(normalized)) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Checks if the HTTP server is running.
  */
@@ -95,9 +109,7 @@ export async function createClient(
   _opts: CreateClientOpts = {},
 ) {
   let { host, port } = args;
-  let isRemote = true;
   if (host === undefined) {
-    isRemote = false;
     host = "127.0.0.1";
   } else if (host.includes("://")) {
     logger.error("Host should not include the protocol.");
@@ -106,8 +118,9 @@ export async function createClient(
     logger.error(`Host should not include the port number. Use ${chalk.yellow("--port")} instead.`);
     process.exit(1);
   }
+  const isLocal = isLocalHost(host);
   let auth: LMStudioClientConstructorOpts;
-  if (isRemote) {
+  if (!isLocal) {
     // If connecting to a remote server, we will use a random client identifier.
     auth = {
       clientIdentifier: `lms-cli-remote-${randomBytes(18).toString("base64")}`,
@@ -143,7 +156,7 @@ export async function createClient(
       }
     }
   }
-  if (port === undefined && host === "127.0.0.1") {
+  if (port === undefined && isLocal) {
     // Use shared helper to find or start llmster
     const serverStatus = await findOrStartLlmster({ logger });
 

@@ -147,13 +147,64 @@ function splitModelNameAndQuantization(modelName: string | undefined) {
     };
   }
 
-  const splitByAt = normalizedModelName.split("@");
-  if (splitByAt.length >= 3) {
-    throw new Error("You cannot have more than 2 @'s in the model name argument.");
+  const raw = normalizedModelName;
+  const len = raw.length;
+  const standaloneAtPositions: Array<number> = [];
+  for (let i = 0; i < len; i++) {
+    if (raw[i] !== "@") {
+      continue;
+    }
+    const prevIsAt = i > 0 && raw[i - 1] === "@";
+    const nextIsAt = i < len - 1 && raw[i + 1] === "@";
+    if (!prevIsAt && !nextIsAt) {
+      standaloneAtPositions.push(i);
+    }
   }
-  normalizedModelName = splitByAt[0]?.trim();
-  if (splitByAt.length === 2) {
-    specifiedQuantName = splitByAt[1]?.trim();
+
+  const unescape = (s: string): string => s.replace(/@@/g, "@");
+
+  if (standaloneAtPositions.length === 0) {
+    normalizedModelName = unescape(raw);
+  } else if (standaloneAtPositions.length === 1) {
+    const sep = standaloneAtPositions[0];
+    const before = raw.slice(0, sep);
+    const after = raw.slice(sep + 1);
+    if (after.includes("@")) {
+      throw new Error(
+        text`
+          Invalid model name: quantization suffix cannot contain '@'.
+          If your model name contains '@', use '@@' to escape it, followed by a single '@' before the quantization.
+          Example: "foo@@bar@Q4_K_M" (model "foo@bar", quantization "Q4_K_M").
+        `,
+      );
+    }
+    normalizedModelName = unescape(before);
+    specifiedQuantName = after === "" ? undefined : after;
+  } else {
+    const sampleEscaped = raw.replace(/@/g, (c, idx) => {
+      const prevIsAt = idx > 0 && raw[idx - 1] === "@";
+      const nextIsAt = idx < len - 1 && raw[idx + 1] === "@";
+      if (prevIsAt || nextIsAt) {
+        return c;
+      }
+      return chalk.red(c);
+    });
+    throw new Error(
+      text`
+        Ambiguous model name: found multiple quantization separators (standalone '@' characters).
+        If your model name contains literal '@' characters, escape them by writing '@@', then use
+        a single '@' before the quantization suffix.
+
+        Input: ${sampleEscaped}
+
+        Example for model "foo@bar@baz" with quantization "Q4_K_M":
+            ${chalk.yellow("foo@@bar@@baz@Q4_K_M")}
+      `,
+    );
+  }
+
+  if (normalizedModelName === "") {
+    normalizedModelName = undefined;
   }
   return {
     modelNameWithoutQuantization: normalizedModelName,
